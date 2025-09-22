@@ -19,20 +19,22 @@ export default function Home() {
     }
   }
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    if (!file) {
-      setUploadStatus({ type: 'error', message: 'Please select a file' })
-      return
-    }
+const handleSubmit = async (e) => {
+  e.preventDefault()
+  if (!file) {
+    setUploadStatus({ type: 'error', message: 'Please select a file' })
+    return
+  }
 
-    setIsUploading(true)
-    setUploadStatus(null)
-    setCommitUrl('')
+  setIsUploading(true)
+  setUploadStatus(null)
+  setCommitUrl('')
 
-    try {
-      const reader = new FileReader()
-      reader.onload = async (event) => {
+  try {
+    const reader = new FileReader()
+    
+    reader.onload = async (event) => {
+      try {
         const base64 = event.target.result.split(',')[1]
         
         const response = await fetch('/api/upload', {
@@ -42,7 +44,7 @@ export default function Home() {
           },
           body: JSON.stringify({
             file: base64,
-            fileName: fileName || file.name,
+            fileName: fileName || file.name.replace(/\.[^/.]+$/, ""), // Remove extension
             originalName: file.name,
             fileType: file.type,
           }),
@@ -56,20 +58,24 @@ export default function Home() {
         } else {
           setUploadStatus({ type: 'error', message: result.error || 'Upload failed' })
         }
-      }
-
-      reader.onerror = () => {
-        setUploadStatus({ type: 'error', message: 'Error reading file' })
+      } catch (error) {
+        setUploadStatus({ type: 'error', message: 'Error processing upload: ' + error.message })
+      } finally {
         setIsUploading(false)
       }
+    }
 
-      reader.readAsDataURL(file)
-    } catch (error) {
-      setUploadStatus({ type: 'error', message: 'Network error occurred' })
-    } finally {
+    reader.onerror = () => {
+      setUploadStatus({ type: 'error', message: 'Error reading file' })
       setIsUploading(false)
     }
+
+    reader.readAsDataURL(file)
+  } catch (error) {
+    setUploadStatus({ type: 'error', message: 'Network error occurred: ' + error.message })
+    setIsUploading(false)
   }
+}
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-dark-900 via-dark-800 to-dark-900">
