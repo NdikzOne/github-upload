@@ -87,7 +87,7 @@ export default async function handler(req, res) {
     const commitUrl = uploadResult.commit.html_url
     const fileUrl = uploadResult.content.html_url
 
-    // Update index.json
+    // Update index.json - pass the file parameter correctly
     await updateIndexFile({
       GITHUB_TOKEN,
       GITHUB_OWNER,
@@ -99,6 +99,7 @@ export default async function handler(req, res) {
       fileUrl,
       fileType,
       originalName,
+      fileContent: file // Pass the file content here
     })
 
     return res.status(200).json({
@@ -126,7 +127,8 @@ async function updateIndexFile({
   commitUrl, 
   fileUrl,
   fileType,
-  originalName 
+  originalName,
+  fileContent // Add this parameter
 }) {
   const indexFilePath = 'uploads/index.json'
   
@@ -153,24 +155,31 @@ async function updateIndexFile({
     }
   } catch (error) {
     // File doesn't exist, will create new one
+    console.log('Creating new index.json file')
   }
+
+  // Calculate file size from base64 content
+  const fileSize = Math.round((fileContent.length * 3) / 4) // Approximate size in bytes
 
   // Add new file entry
   const newEntry = {
     name: fileName,
-    originalName,
+    originalName: originalName,
     path: filePath,
     type: fileType,
     uploadTime: new Date().toISOString(),
-    commitUrl,
-    fileUrl,
-    size: Math.round(Buffer.from(file, 'base64').length * 0.75) // Approximate size in bytes
+    commitUrl: commitUrl,
+    fileUrl: fileUrl,
+    size: fileSize
   }
 
   // Remove existing entry if file was updated
   currentIndex.files = currentIndex.files.filter(f => f.path !== filePath)
   currentIndex.files.push(newEntry)
   currentIndex.lastUpdated = new Date().toISOString()
+
+  // Sort files by upload time (newest first)
+  currentIndex.files.sort((a, b) => new Date(b.uploadTime) - new Date(a.uploadTime))
 
   // Update index.json
   const indexContent = Buffer.from(JSON.stringify(currentIndex, null, 2)).toString('base64')
@@ -195,6 +204,7 @@ async function updateIndexFile({
 
   if (!indexUpdateResponse.ok) {
     const error = await indexUpdateResponse.json()
-    throw new Error(`Failed to update index: ${error.message}`)
+    console.error('Failed to update index:', error)
+    // Don't throw error here - main upload succeeded, index update is secondary
   }
 }
