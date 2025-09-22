@@ -5,7 +5,7 @@ export default function Home() {
   const [fileName, setFileName] = useState('')
   const [isUploading, setIsUploading] = useState(false)
   const [uploadStatus, setUploadStatus] = useState(null)
-  const [commitUrl, setCommitUrl] = useState('')
+  const [fileUrls, setFileUrls] = useState({ rawUrl: '', githubUrl: '', commitUrl: '' })
 
   const handleFileChange = (e) => {
     const selectedFile = e.target.files[0]
@@ -15,67 +15,72 @@ export default function Home() {
         return
       }
       setFile(selectedFile)
-      setFileName(selectedFile.name.split('.')[0])
+      // Set default file name without extension
+      setFileName(selectedFile.name.replace(/\.[^/.]+$/, ""))
     }
   }
 
-const handleSubmit = async (e) => {
-  e.preventDefault()
-  if (!file) {
-    setUploadStatus({ type: 'error', message: 'Please select a file' })
-    return
-  }
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    if (!file) {
+      setUploadStatus({ type: 'error', message: 'Please select a file' })
+      return
+    }
 
-  setIsUploading(true)
-  setUploadStatus(null)
-  setCommitUrl('')
+    setIsUploading(true)
+    setUploadStatus(null)
+    setFileUrls({ rawUrl: '', githubUrl: '', commitUrl: '' })
 
-  try {
-    const reader = new FileReader()
-    
-    reader.onload = async (event) => {
-      try {
-        const base64 = event.target.result.split(',')[1]
-        
-        const response = await fetch('/api/upload', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            file: base64,
-            fileName: fileName || file.name.replace(/\.[^/.]+$/, ""), // Remove extension
-            originalName: file.name,
-            fileType: file.type,
-          }),
-        })
+    try {
+      const reader = new FileReader()
+      
+      reader.onload = async (event) => {
+        try {
+          const base64 = event.target.result.split(',')[1]
+          
+          const response = await fetch('/api/upload', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              file: base64,
+              fileName: fileName || file.name.replace(/\.[^/.]+$/, ""),
+              originalName: file.name,
+              fileType: file.type,
+            }),
+          })
 
-        const result = await response.json()
+          const result = await response.json()
 
-        if (response.ok) {
-          setUploadStatus({ type: 'success', message: 'File uploaded successfully!' })
-          setCommitUrl(result.commitUrl)
-        } else {
-          setUploadStatus({ type: 'error', message: result.error || 'Upload failed' })
+          if (response.ok) {
+            setUploadStatus({ type: 'success', message: 'File uploaded successfully!' })
+            setFileUrls({
+              rawUrl: result.rawUrl,
+              githubUrl: result.githubUrl,
+              commitUrl: result.commitUrl
+            })
+          } else {
+            setUploadStatus({ type: 'error', message: result.error || 'Upload failed' })
+          }
+        } catch (error) {
+          setUploadStatus({ type: 'error', message: 'Error processing upload: ' + error.message })
+        } finally {
+          setIsUploading(false)
         }
-      } catch (error) {
-        setUploadStatus({ type: 'error', message: 'Error processing upload: ' + error.message })
-      } finally {
+      }
+
+      reader.onerror = () => {
+        setUploadStatus({ type: 'error', message: 'Error reading file' })
         setIsUploading(false)
       }
-    }
 
-    reader.onerror = () => {
-      setUploadStatus({ type: 'error', message: 'Error reading file' })
+      reader.readAsDataURL(file)
+    } catch (error) {
+      setUploadStatus({ type: 'error', message: 'Network error occurred: ' + error.message })
       setIsUploading(false)
     }
-
-    reader.readAsDataURL(file)
-  } catch (error) {
-    setUploadStatus({ type: 'error', message: 'Network error occurred: ' + error.message })
-    setIsUploading(false)
   }
-}
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-dark-900 via-dark-800 to-dark-900">
@@ -160,18 +165,44 @@ const handleSubmit = async (e) => {
               </div>
             )}
 
-            {/* Commit URL */}
-            {commitUrl && (
-              <div className="mt-6 p-4 bg-primary-500/10 border border-primary-500/30 rounded-lg">
-                <p className="text-sm text-gray-300 mb-2">Upload successful! Commit URL:</p>
-                <a 
-                  href={commitUrl} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="text-primary-400 hover:text-primary-300 break-all underline"
-                >
-                  {commitUrl}
-                </a>
+            {/* File URLs */}
+            {fileUrls.rawUrl && (
+              <div className="mt-6 space-y-4">
+                <div className="p-4 bg-primary-500/10 border border-primary-500/30 rounded-lg">
+                  <p className="text-sm text-gray-300 mb-2">📁 GitHub Raw URL (Direct Link):</p>
+                  <a 
+                    href={fileUrls.rawUrl} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-primary-400 hover:text-primary-300 break-all underline text-sm"
+                  >
+                    {fileUrls.rawUrl}
+                  </a>
+                </div>
+
+                <div className="p-4 bg-primary-500/10 border border-primary-500/30 rounded-lg">
+                  <p className="text-sm text-gray-300 mb-2">🔗 GitHub File View:</p>
+                  <a 
+                    href={fileUrls.githubUrl} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-primary-400 hover:text-primary-300 break-all underline text-sm"
+                  >
+                    {fileUrls.githubUrl}
+                  </a>
+                </div>
+
+                <div className="p-4 bg-primary-500/10 border border-primary-500/30 rounded-lg">
+                  <p className="text-sm text-gray-300 mb-2">📝 Commit Details:</p>
+                  <a 
+                    href={fileUrls.commitUrl} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-primary-400 hover:text-primary-300 break-all underline text-sm"
+                  >
+                    {fileUrls.commitUrl}
+                  </a>
+                </div>
               </div>
             )}
           </div>
@@ -180,6 +211,9 @@ const handleSubmit = async (e) => {
           <div className="mt-8 text-center text-gray-400">
             <p className="text-sm">
               Files are uploaded to the <code className="bg-dark-700 px-2 py-1 rounded">uploads/</code> directory in your GitHub repository
+            </p>
+            <p className="text-sm mt-2">
+              Use the <strong>Raw URL</strong> for direct file access in your applications
             </p>
           </div>
         </div>
