@@ -85,9 +85,11 @@ export default async function handler(req, res) {
     }
 
     const commitUrl = uploadResult.commit.html_url
-    const fileUrl = uploadResult.content.html_url
+    // Generate GitHub Raw URL
+    const rawUrl = `https://raw.githubusercontent.com/${GITHUB_OWNER}/${GITHUB_REPO}/${GITHUB_BRANCH}/${filePath}`
+    const githubUrl = `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/blob/${GITHUB_BRANCH}/${filePath}`
 
-    // Update index.json - pass the file parameter correctly
+    // Update index.json
     await updateIndexFile({
       GITHUB_TOKEN,
       GITHUB_OWNER,
@@ -96,16 +98,18 @@ export default async function handler(req, res) {
       fileName: finalFileName,
       filePath,
       commitUrl,
-      fileUrl,
+      rawUrl,
+      githubUrl,
       fileType,
       originalName,
-      fileContent: file // Pass the file content here
+      fileContent: file
     })
 
     return res.status(200).json({
       success: true,
       commitUrl,
-      fileUrl,
+      rawUrl,
+      githubUrl,
       message: 'File uploaded successfully'
     })
 
@@ -125,10 +129,11 @@ async function updateIndexFile({
   fileName, 
   filePath, 
   commitUrl, 
-  fileUrl,
+  rawUrl,
+  githubUrl,
   fileType,
   originalName,
-  fileContent // Add this parameter
+  fileContent
 }) {
   const indexFilePath = 'uploads/index.json'
   
@@ -169,7 +174,8 @@ async function updateIndexFile({
     type: fileType,
     uploadTime: new Date().toISOString(),
     commitUrl: commitUrl,
-    fileUrl: fileUrl,
+    rawUrl: rawUrl,
+    githubUrl: githubUrl,
     size: fileSize
   }
 
@@ -205,6 +211,5 @@ async function updateIndexFile({
   if (!indexUpdateResponse.ok) {
     const error = await indexUpdateResponse.json()
     console.error('Failed to update index:', error)
-    // Don't throw error here - main upload succeeded, index update is secondary
   }
 }
